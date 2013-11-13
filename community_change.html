@@ -72,7 +72,7 @@
     var links;
 
 
-    d3.json("track_community-Classes-cumulative-10.json", function(error,graph){
+    d3.json("http://ross.kaist.ac.kr/TE/track_community-Classes-cumulative-10.json", function(error,graph){
 
         var link = svg.selectAll(".link")
             .data(graph.links)
