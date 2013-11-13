@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+    <meta charset="utf-8">
+
+    <style>
+
+    .node {
+        stroke-width: 1.5px;
+        opacity: .6;
+    }
+    .node:hover {
+        opacity: .9;
+    }
+
+    .path {
+        fill: none;
+        stroke: #000;
+        stroke-opacity: .2;
+        -moz-border-radius: 20px;
+        border-radius: 20px;
+    }
+
+    .path:hover {
+        stroke: #000;
+        stroke-opacity: .5;
+    }
+
+    .text {
+        stroke: #555;
+        stroke-width: 0.2;
+    }
+
+    .tooltip {
+        overflow:auto;
+        display:none;
+        background-color:black;
+        opacity: .8;
+        font-size:8px;
+        height:80px;
+        width:220px;
+        padding:10px;
+        color:#fff;	
+    }
+
+    
+    </style>
+
+    <body>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://cdn.jquerytools.org/1.2.6/jquery.tools.min.js"></script>
+
+    <script>
+
+    var width  = 1200,
+        height = 2100;
+
+    var lalign = 200;
+    var xscale = 20;
+    var talign = 250;
+
+    var x_max = -999999;
+    var x_min = 9999999;
+
+    var fill = d3.scale.category20();
+
+    var svg = d3.select("body").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    
+    var code_list = svg.append("svg:g").attr("id","codeList");
+
+    var nodes;
+    var links;
+
+
+    d3.json("track_community-Classes-cumulative-10.json", function(error,graph){
+
+        var link = svg.selectAll(".link")
+            .data(graph.links)
+            .enter().append("path")
+            .attr("class","path")
+            .attr("d", function(d) {
+                var x1 = (parseInt(d.year1)-1790)*xscale-lalign;
+                var y1 = d.comm1*30+100+talign;
+                var x2 = (parseInt(d.year0)-1790)*xscale-lalign;
+                var y2 = d.comm0*30+100+talign;
+                var ax = (x2 + x1)/2;
+                return "M" + x1 + "," + y1 + " C" + ax + "," + y1 + " " + ax + "," + y2 + " " + x2 + "," + y2;
+            })
+            .attr("title", function(d,i){
+                var tmp_str = "";
+                for (var j=0; j<d.codeList.length-1; ++j){
+                    tmp_str += d.codeList[j]+"<BR>";
+                }
+                tmp_str += d.codeList[d.codeList.length-1];
+                return tmp_str;
+            })
+            .on("mouseover",function(s){
+                svg.selectAll(".path").filter(function(d){ return (d.year1 == s.year1 && d.comm1 == s.comm1) || (d.year0 == s.year0 && d.comm0 == s.comm0 ); })
+                    .style("stroke", "#000")
+                    .style("stroke-opacity",".5");
+            })
+            .on("mouseout",function(s){
+                svg.selectAll(".path").filter(function(d){ return (d.year1 == s.year1 && d.comm1 == s.comm1) || (d.year0 == s.year0 && d.comm0 == s.comm0 ); })
+                    .style("stroke", "#000")
+                    .style("stroke-opacity",".2");
+            })
+            .style("stroke-width", function(d){ return d.linkWeight });
+
+
+        var node = svg.selectAll(".node")
+            .data(graph.nodes)
+            .enter().append("circle")
+              .attr("class", "node")
+              .attr("cx", function(d) {
+                var val = (parseInt(d.year)-1790)*xscale-lalign;
+                return val; 
+              })
+              .attr("cy", function(d) { 
+                return d.comm*30+100+talign; 
+              })
+              .attr("r", function(d) {
+                return d.commSize;
+              })
+              .attr("title", function(d,i){
+                var tmp_str = "";
+                for (var j=0; j<d.codeList.length-1; ++j){
+                    tmp_str += d.codeList[j]+"<BR>";
+                }
+                tmp_str += d.codeList[d.codeList.length-1];
+                return tmp_str;
+              })
+              .style("fill", function(d) {
+                return fill(d.comm);
+              })
+              .on("mouseover", function(d){
+                  // enhance all the links that end here
+                  enhanceNode(d);
+              })
+              .on("mouseout", function(d){
+                  resetNode(d);
+              })
+            
+
+        var text = svg.selectAll(".text")
+            .data(graph.years)
+            .enter().append("text")
+            .attr("class","text")
+            .attr("x", function(d){ 
+                return (parseInt(d.yeartxt)-1790)*xscale-20-lalign; })
+            .attr("y", function(d){ return 60+talign;})
+            .text(function(d){ return d.yeartxt; });
+
+        $("circle[title]").tooltip();
+        $("path[title]").tooltip({
+            offset: [0,100]
+        });
+
+        function enhanceNode(selectedNode) {
+            link.filter ( function (d) {
+                return (d.year1 == selectedNode.year && d.comm1 == selectedNode.comm) || (d.year0 == selectedNode.year && d.comm0 == selectedNode.comm);
+            } )
+            .style("stroke", "#800")
+            .style("stroke-opacity",".5");
+        }
+        function resetNode(selectedNode) {
+            link
+            .style("stroke", "#000")
+            .style("stroke-opacity",".2");
+        }
+
+
+        svg.call(d3.behavior.drag()
+            .on("drag", function(d){
+            
+                    svg.selectAll(".node").attr("cx", function(d){ 
+//                        tmp_arr.push(parseInt(d3.select(this).attr("cx")));
+                        return parseInt(d3.select(this).attr("cx"))+d3.event.dx;
+                    });
+                    svg.selectAll(".path")
+                    .attr("d", function(d){ 
+                            var pts = d3.select(this).attr("d").split(" ");
+                            var p1 = pts[0].split(",");
+                            var p2 = pts[3].split(",");
+                            var x1 = parseInt(p1[0].substring(1))+d3.event.dx;
+                            var y1 = parseInt(p1[1]);
+                            var x2 = parseInt(p2[0])+d3.event.dx;
+                            var y2 = parseInt(p2[1]);
+                            var ax = (x2 + x1)/2;
+                            return "M" + x1 + "," + y1 + "C" + ax + "," + y1 + " " + ax + "," + y2 + "  " + x2 + "," + y2;
+                        });
+                    svg.selectAll(".text").attr("x", function(d){ 
+                       return parseInt(d3.select(this).attr("x"))+d3.event.dx;
+                    });
+            })
+        );
+      });
+ 
+
+
+    </script>
+
+    </body>
+</html>
+
